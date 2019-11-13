@@ -9,6 +9,7 @@ import numpy as np
 import math
 from scipy.stats import truncnorm
 from scipy.stats import norm
+from scipy.stats import kstest
 import scipy.integrate as intergrate
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
@@ -87,7 +88,7 @@ def compute_integral_1st(smin,smax,mu,sigma,t_space,nsample=1000,use_CV=False):
     left_point = end_point[0:-1]
     right_point = end_point[1:]
     final_result = np.multiply(np.diff(t_space),np.mean([left_point,right_point],axis=0))
-    return(final_result)
+    return(end_point,final_result)
 
 
 def compute_integral_2nd(smin,smax,mu,sigma,t_space,nsample=1000,use_CV=False):
@@ -105,6 +106,23 @@ def compute_integral_2nd(smin,smax,mu,sigma,t_space,nsample=1000,use_CV=False):
     quad_approx = first_approx - np.multiply(np.power(diff_t_space,2),\
                          np.diff(var_end_point))/12
     return(first_approx,quad_approx)
+    
+def true_second_moment(smin,smax,mu,sigma,t):
+    sigma0 = 1/math.sqrt(2*t)
+    a = 1/math.sqrt(2*sigma)*(smin - mu)
+    b = 1/math.sqrt(2*sigma)*(smax - mu)
+    alpha = (a-mu)/sigma0
+    beta = (b-mu)/sigma0
+    phi_alpha = norm.pdf(alpha)
+    phi_beta = norm.pdf(beta)
+    Phi_alpha = norm.cdf(alpha)
+    Phi_beta = norm.cdf(beta)
+    Z = Phi_beta - Phi_alpha
+    mean_value = mu + (phi_alpha - phi_beta)/Z*sigma0
+    var_value = np.power(sigma0,2)*(1+(alpha*phi_alpha-beta*phi_beta)/Z\
+                         + np.power((phi_alpha-phi_beta)/Z,2))
+    second_m = var_value+np.power(mean_value,2)
+    return(-second_m-0.5*np.log(2*np.pi)-np.log(sigma))
                                              
 #%%    
         
@@ -117,59 +135,67 @@ sigma = 1
 log_phi0 = np.log(smax-smin)
 
 
-#result = intergrate.quad(intergrand,0.00,1,args=(smin,smax,mu,sigma))
-#print('estimation of log phi1-[by intergrate.quad]:',result[0]+log_phi0)
-
 # est_log_phi1 = log_phi0 + result[0]
 true_log_phi1 = log_phi1(smin=smin,smax=smax,mu=mu,sigma=sigma)
 
-
 t_space = np.log(np.logspace(start=0.0001,stop=1,base=np.e,num=2000))
 #t_space = np.linspace(start=0.001,stop=1,num=2000)
-est_log_phi1_per_t = compute_integral_1st(smin,smax,mu,sigma,t_space)
+est_log_phi1_per_t,est_log_phi1 = compute_integral_1st(smin,smax,mu,sigma,t_space)
 
-print('estimation of log phi1:', np.sum(est_log_phi1_per_t)+log_phi0)
+true_2nd_moment = [true_second_moment(smin,smax,mu,sigma,t) for t in t_space]
+
+
+print('estimation of log phi1:', np.sum(est_log_phi1)+log_phi0)
 print('true value of log phi1:', true_log_phi1)
 
-plt.figure(figsize=(6,6))
-plt.plot(t_space[0:-1],est_log_phi1_per_t)
-
-plt.savefig('true_vs_estimation.png')
+f = plt.figure(figsize=(6,6))
+plt.plot(t_space,est_log_phi1_per_t,label='estimation')
+plt.plot(t_space,true_2nd_moment,label='true value')
+plt.xlabel('t')
+plt.ylabel('expectation')
+plt.legend()
+f.savefig('true_vs_estimation.pdf',bbox_iches = 'tight')
 plt.close()
-#%% replication of 200 times
+#%% replication of 1000 times
 
-nrep = 100
+"""
+nrep = 10000
 est_log_phi1_1st_app = np.zeros(nrep)
 est_log_phi1_2nd_app = np.zeros(nrep)
 for i in range(nrep):
     first_app,second_app= compute_integral_2nd(smin,smax,mu,sigma,t_space)
     est_log_phi1_1st_app[i] = np.sum(first_app)
     est_log_phi1_2nd_app[i] = np.sum(second_app)
+"""
 
+est_log_phi1_1st_app = np.load('replications_10000_MC_1st_app.npy')
+est_log_phi1_2nd_app = np.load('replications_10000_MC_2nd_app.npy')
 # almost no difference between 1st/2nd order approximation
-plt.figure(figsize=(6,6))
-plt.plot(est_log_phi1_1st_app+log_phi0,'-',color='orange')
-plt.plot(est_log_phi1_2nd_app+log_phi0,'-.',color='k')
-plt.axhline(true_log_phi1, color='k', linestyle='dashed', linewidth=1,\
-            label='true value')
-plt.axhline(np.mean(est_log_phi1_1st_app)+log_phi0,linestyle='dashed',\
-            color='r',label='mean value 1st order')
-plt.axhline(np.mean(est_log_phi1_2nd_app)+log_phi0,linestyle='dashed',\
-            color='b',label='mean value 2nd order')
-plt.legend()
-plt.savefig('1st vs 2nd quadrature approximaiton.png')
+
+f0 = plt.figure(figsize=(6,6))
+plt.hist(est_log_phi1_1st_app-est_log_phi1_2nd_app)
+plt.title('difference between 1st and 2nd order approximation')
+f0.savefig('diff_between_1st_2nd_app.pdf',bbox_inches = 'tight')
 plt.show()
 
-plt.figure(figsize=(6,6))
+f1 = plt.figure(figsize=(6,6))
 plt.hist(est_log_phi1_1st_app+log_phi0)
 plt.axvline(true_log_phi1, color='k', linestyle='dashed', linewidth=1,\
             label='true value')
 plt.axvline(np.mean(est_log_phi1_1st_app)+log_phi0,linestyle='dashed',\
             color='r',label='mean value')
-plt.title('100 replications')
-plt.savefig('100 replication of log estimate.png')
+plt.title('10,000 replications')
+f1.savefig('10,000_replication_of_log_estimate.pdf',bbox_inches='tight')
 plt.legend()
 
+f2 = plt.figure(figsize=(6,6))
+f2 = sm.qqplot(est_log_phi1_1st_app, line='s')
+plt.title('qq-plot for 10,000 replications')
+f2.savefig('qq_plot_10,000_replications.pdf',bbox_inches='tight',dpi=100)
+plt.show
+
+kstest(est_log_phi1_1st_app, 'norm',args = (np.mean(est_log_phi1_1st_app),\
+                                            np.std(est_log_phi1_1st_app)))
 #%% Let's consider control variates
 
 cv_result = compute_integral_1st(smin,smax,mu,sigma,t_space,1000,True)
