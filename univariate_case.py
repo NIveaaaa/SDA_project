@@ -13,10 +13,11 @@ from scipy.stats import kstest
 import scipy.integrate as intergrate
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
-
+#%%
 class Univariate_Normal_Path_sample:
     
-    def __init__(self,smin,smax,t,mu,sigma,nsample = None, use_CV = False):
+    def __init__(self,smin,smax,t,mu,sigma,\
+                 nsample = None, use_CV = False, CV_order = 1):
         self.smin = smin
         self.smax = smax
         self.t = t
@@ -28,7 +29,8 @@ class Univariate_Normal_Path_sample:
         else: self.nsample = nsample
         self.expectation = None
         self.z = None
-        self.use_CV = use_CV    
+        self.use_CV = use_CV 
+        self.CV_order = CV_order
         # sample z here
         a = (smin - self.mu)/self.sigma_at_t
         b = (smax - self.mu)/self.sigma_at_t
@@ -57,14 +59,17 @@ class Univariate_Normal_Path_sample:
         # theta = [mu, sigma_at_t]
         # h_theta is the control variates
         # phi_theta is the origin estimates
-        grad_theta = np.zeros(shape = (self.nsample,1))
-        grad_theta[:,0] = (self.mu - self.z)/np.power(self.sigma_at_t,2) 
-          
-      
-        x_theta = sm.add_constant(grad_theta)
+        if (self.CV_order==1):
+            x = np.zeros(shape = (self.nsample,1))
+            x[:,0] = (self.mu - self.z)/np.power(self.sigma_at_t,2) 
+        if (self.CV_order==2):
+            x = np.zeros(shape=(self.nsample ,2))
+            x[:,0] = (self.mu - self.z)/np.power(self.sigma_at_t,2)
+            x[:,1] = 2+ 2*np.multiply(x[:,0],self.z)
+        x_theta = sm.add_constant(x)
         model = sm.OLS(self.phi_theta, x_theta)
         results = model.fit()
-        self.h_theta = np.sum(np.multiply(grad_theta,results.params[1:]),axis=1)
+        self.h_theta = np.sum(np.multiply(x,results.params[1:]),axis=1)
 
         
 
@@ -79,10 +84,10 @@ def log_phi1(smin,smax,mu,sigma):
                     -norm.cdf(smin,loc=mu,scale=sigma)))
     
 
-def compute_integral_1st(smin,smax,mu,sigma,t_space,nsample=1000,use_CV=False):
+def compute_integral_1st(smin,smax,mu,sigma,t_space,nsample=1000,use_CV=False,CV_order = 1):
     end_point = np.zeros(t_space.shape[0])
     for i in np.arange(start=0,stop=t_space.shape[0],step=1):
-        uni = Univariate_Normal_Path_sample(smin,smax,t_space[i],mu,sigma,nsample,use_CV)
+        uni = Univariate_Normal_Path_sample(smin,smax,t_space[i],mu,sigma,nsample,use_CV, CV_order)
         uni.get_expection() # compute the expecation
         end_point[i] = uni.expectation
     left_point = end_point[0:-1]
@@ -91,11 +96,11 @@ def compute_integral_1st(smin,smax,mu,sigma,t_space,nsample=1000,use_CV=False):
     return(end_point,final_result)
 
 
-def compute_integral_2nd(smin,smax,mu,sigma,t_space,nsample=1000,use_CV=False):
+def compute_integral_2nd(smin,smax,mu,sigma,t_space,nsample=1000,use_CV=False,CV_order=1):
     mean_end_point = np.zeros(t_space.shape[0])
     var_end_point = np.zeros(t_space.shape[0])
     for i in np.arange(start=0,stop=t_space.shape[0],step=1):
-        uni = Univariate_Normal_Path_sample(smin,smax,t_space[i],mu,sigma,nsample,use_CV)
+        uni = Univariate_Normal_Path_sample(smin,smax,t_space[i],mu,sigma,nsample,use_CV,CV_order)
         uni.get_expection()
         mean_end_point[i] = uni.expectation
         var_end_point[i] = np.std(uni.z)
@@ -198,9 +203,19 @@ kstest(est_log_phi1_1st_app, 'norm',args = (np.mean(est_log_phi1_1st_app),\
                                             np.std(est_log_phi1_1st_app)))
 #%% Let's consider control variates
 
-cv_result = compute_integral_1st(smin,smax,mu,sigma,t_space,1000,True)
- 
+# 1st order approximation
+cv_1st,cv_1st_grid = compute_integral_1st(smin,smax,mu,sigma,t_space,1000,True,1)
 
-plt.plot(t_space[0:-1],est_log_phi1_per_t)
-plt.plot(t_space[0:-1],cv_result,color='k')
+# 2nd order approximation does not work
+# cv_2nd,_, = compute_integral_1st(smin,smax,mu,sigma,t_space,1000,True,2)
+
+f3 = plt.figure(figsize=(6,6))
+plt.plot(t_space,est_log_phi1_per_t,label="no CV")
+plt.plot(t_space,cv_1st,color='k',label="1st order polynomial")
+plt.legend()
+f3.savefig('CV_1st_order.pdf',bbox_inches='tight',dpi=100)
 plt.show()
+
+print('estimation of log phi1: (No CV)', np.sum(est_log_phi1)+log_phi0)
+print('estimation of log phi1: (1st polynomial)', np.sum(cv_1st_grid)+log_phi0)
+print('true value of log phi1:', true_log_phi1)
