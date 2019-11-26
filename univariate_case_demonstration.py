@@ -20,7 +20,7 @@ import univariate_case as uc
         
 smin = -2
 smax = 2
-mu = 0
+mu = 0.5
 sigma = 1
 
 
@@ -91,8 +91,8 @@ plt.show
 
 kstest(est_log_phi1_1st_app, 'norm',args = (np.mean(est_log_phi1_1st_app),\
                                             np.std(est_log_phi1_1st_app)))
-#%% Let's consider control variates
-
+#%% Let's consider control variates 
+# todo: ZV does not work
 # 1st order approximation
 cv_1st,cv_1st_grid = uc.compute_integral_1st(smin,smax,mu,sigma,t_space,1000,True,1)
 
@@ -104,7 +104,7 @@ plt.plot(t_space,est_log_phi1_per_t,label="no CV")
 plt.plot(t_space,cv_1st,color='k',label="1st order polynomial")
 plt.plot(t_space,cv_2nd,color='y',label="2nd order polynomial")
 plt.legend()
-f3.savefig('CV_1st_order.pdf',bbox_inches='tight',dpi=100)
+#f3.savefig('CV_1st_order.pdf',bbox_inches='tight',dpi=100)
 plt.show()
 
 print('estimation of log phi1: (No CV)', np.sum(est_log_phi1)+log_phi0)

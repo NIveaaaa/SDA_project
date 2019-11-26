@@ -1,0 +1,80 @@
+---
+title: "ZV-CV"
+author: "Yu Yang"
+date: "22 November 2019"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+An example:
+
+We plan to evaluate $E_{z\sim q}[log g(z;\theta)]dz$, where $q_t(z,\theta) = TN(\mu,\sigma/\sqrt{t})$ (a truncated normal distribution), $g(z;\theta)=N(\mu,\sigma)$.
+
+Suppose $smin = -2$, $smax = 2$, $t = 1$, $\mu=1$,$\sigma=1$.
+
+We can obtain expectation analytically by:
+
+\[ E_{z\sim q} [ log g(z;\theta)] = -0.5 log 2\pi - log\sigma - E_{z\sim q} \dfrac{(z-\mu)^2}{2\sigma^2} \]
+
+```{r}
+library(ZVCV)
+library(truncnorm)
+
+true_value =function(smin,smax,mu,sigma,t){
+  a = (smin - mu)/sigma/sqrt(2*t)
+  b = (smax - mu)/sigma/sqrt(2*t)
+  mean_value = etruncnorm(a,b,mean=0,sd =1/sqrt(2*t))
+  var_value = vtruncnorm(a,b,mean=0,sd=1/sqrt(2*t))
+  true_value = -0.5*log(2*pi)-log(sigma)- mean_value^2-var_value
+  return(true_value)
+}
+
+
+N <- 1000
+#mymean = c(1,2)
+#mycov <- matrix(c(1,0.5,0.5,2),nrow=2)
+mymean = 1
+mycov = 1
+t = 1
+require(mvtnorm)
+set.seed(1)
+samples <- rtruncnorm(N,a=-2,b=2,mymean,sqrt(mycov/t/t))
+# samples <- rmvnorm(N, mean = mymean, sigma = mycov)
+integrand <- dnorm(samples,mymean,sqrt(mycov/t/t),log=TRUE)
+
+
+#' # derivatives of Gaussian wrt x
+#derivatives <- t( apply(samples,1,function(x) -solve(mycov)%*%(x - mymean)) ) 
+derivatives <- c(-solve(mycov))*(samples-mymean)*t
+#' 
+#' # Estimates without ZV-CV (i.e. vanilla Monte Carlo integration)
+#' # Without the ZVCV package
+mean(integrand)
+#' # With the ZVCV package
+order0<-zvcv(integrand,samples,derivatives,options = list(polyorder = 0))$expectation
+
+# polynomial with order 1 
+order1<-zvcv(integrand,samples,derivatives,options = list(polyorder = 1,regul_reg=FALSE))$expectation
+
+# polynomial with order 2 
+order2<-zvcv(integrand,samples,derivatives,options = list(polyorder = 2,regul_reg=FALSE))$expectation
+
+# true value
+tv <- true_value(smin=-2,smax=2,mu=mymean,sigma=sqrt(mycov/t/t),t=1)
+
+sprintf(paste('true value:',tv))
+
+sprintf(paste('order 0:', order0))
+
+sprintf(paste('order 1:', order1))
+
+sprintf(paste('order 2:', order2))
+
+
+```
