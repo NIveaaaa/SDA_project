@@ -112,3 +112,6 @@ venv.bak/
 test.py
 
 *.R
+*.docx
+*.html
+*.Rmd
