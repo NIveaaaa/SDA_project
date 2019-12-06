@@ -110,7 +110,7 @@ venv.bak/
 *.jpeg
 *.pdf
 test.py
-
+*.txt
 *.R
 *.docx
 *.html
