@@ -32,6 +32,6 @@ def compute_integral_1st(est_expect,t_space):
     left_point = end_point[0:-1]
     right_point = end_point[1:]
     final_result = np.multiply(np.diff(t_space),np.mean([left_point,right_point],axis=0))
-    return end_point,np.sum(final_result)
+    return end_point,np.sum(final_result)+end_point[0]*t_space[0]
 
 

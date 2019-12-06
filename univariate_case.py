@@ -4,7 +4,7 @@ Created on Tue Nov  5 21:39:22 2019
 
 @author: z5187692
 """
-
+import torch
 import numpy as np
 import math
 from scipy.stats import truncnorm
@@ -18,7 +18,7 @@ import SDAutility as Sutil
 class Univariate_Normal_Path_sample:
     
     def __init__(self,smin,smax,t,mu,sigma,\
-                 nsample = None, use_CV = False, CV_order = 1):
+                 nsample = None, use_CV = False, CV_order = 1,use_qmc=False):
         self.smin = smin
         self.smax = smax
         self.t = t
@@ -35,10 +35,14 @@ class Univariate_Normal_Path_sample:
         # sample z here
         a = (smin - self.mu)/self.sigma_at_t
         b = (smax - self.mu)/self.sigma_at_t
-        
-        self.z = truncnorm.rvs(a,b,loc=self.mu,\
+        if not use_qmc:
+            self.z = truncnorm.rvs(a,b,loc=self.mu,\
                                scale = self.sigma_at_t,\
                                size=self.nsample)
+        else:
+            soboleng = torch.quasirandom.SobolEngine(dimension = 1,scramble=True)
+            self.z = truncnorm.ppf(soboleng.draw(self.nsample),a,b,loc=self.mu,\
+                                   scale=self.sigma_at_t)
         self.phi_theta = None
         self.h_theta = None
     
@@ -95,10 +99,10 @@ def log_phi1(smin,smax,mu,sigma):
                     -norm.cdf(smin,loc=mu,scale=sigma)))
     
 
-def compute_integral_1st(smin,smax,mu,sigma,t_space,nsample=1000,use_CV=False,CV_order = 1):
+def compute_integral_1st(smin,smax,mu,sigma,t_space,nsample=1000,use_CV=False,CV_order = 1,use_qmc=False):
     end_point = np.zeros(t_space.shape[0])
     for i in np.arange(start=0,stop=t_space.shape[0],step=1):
-        uni = Univariate_Normal_Path_sample(smin,smax,t_space[i],mu,sigma,nsample,use_CV, CV_order)
+        uni = Univariate_Normal_Path_sample(smin,smax,t_space[i],mu,sigma,nsample,use_CV, CV_order,use_qmc)
         uni.get_expection() # compute the expecation
         end_point[i] = uni.expectation
     left_point = end_point[0:-1]
@@ -107,11 +111,11 @@ def compute_integral_1st(smin,smax,mu,sigma,t_space,nsample=1000,use_CV=False,CV
     return(end_point,final_result)
 
 
-def compute_integral_2nd(smin,smax,mu,sigma,t_space,nsample=1000,use_CV=False,CV_order=1):
+def compute_integral_2nd(smin,smax,mu,sigma,t_space,nsample=1000,use_CV=False,CV_order=1,use_qmc=False):
     mean_end_point = np.zeros(t_space.shape[0])
     var_end_point = np.zeros(t_space.shape[0])
     for i in np.arange(start=0,stop=t_space.shape[0],step=1):
-        uni = Univariate_Normal_Path_sample(smin,smax,t_space[i],mu,sigma,nsample,use_CV,CV_order)
+        uni = Univariate_Normal_Path_sample(smin,smax,t_space[i],mu,sigma,nsample,use_CV,CV_order,use_qmc)
         uni.get_expection()
         mean_end_point[i] = uni.expectation
         var_end_point[i] = np.std(uni.z)

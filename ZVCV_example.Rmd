@@ -44,7 +44,9 @@ mycov = 1
 t = 1
 require(mvtnorm)
 set.seed(1)
-samples <- rtruncnorm(N,a=-2,b=2,mymean,sqrt(mycov/t/t))
+smin_set = -1
+smax_set = 1
+samples <- rtruncnorm(N,a=smin_set,b=smax_set,mymean,sqrt(mycov/t/t))
 # samples <- rmvnorm(N, mean = mymean, sigma = mycov)
 integrand <- dnorm(samples,mymean,sqrt(mycov/t/t),log=TRUE)
 
@@ -66,7 +68,10 @@ order1<-zvcv(integrand,samples,derivatives,options = list(polyorder = 1,regul_re
 order2<-zvcv(integrand,samples,derivatives,options = list(polyorder = 2,regul_reg=FALSE))$expectation
 
 # true value
-tv <- true_value(smin=-2,smax=2,mu=mymean,sigma=sqrt(mycov/t/t),t=1)
+tv <- true_value(smin=smin_set,smax=smax_set,mu=mymean,sigma=sqrt(mycov/t/t),t=1)
+
+
+sprintf(paste('smin/smax:',smin_set,'/',smax_set))
 
 sprintf(paste('true value:',tv))
 
