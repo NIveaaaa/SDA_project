@@ -7,6 +7,10 @@ Created on Mon Nov 25 15:07:10 2019
 
 import numpy as np
 from scipy.special import comb
+import rpy2.robjects.packages as rpackages
+import rpy2.robjects as robjects
+
+TruncatedNormal = rpackages.importr('TruncatedNormal')
 
 def getX_order1(derivative):
     Z = -0.5*derivative
@@ -34,4 +38,21 @@ def compute_integral_1st(est_expect,t_space):
     final_result = np.multiply(np.diff(t_space),np.mean([left_point,right_point],axis=0))
     return end_point,np.sum(final_result)+end_point[0]*t_space[0]
 
+def Rrtmvnorm(mu,sigma,smin,smax,nsample):
+    try:
+        TruncatedNormal
+    except Error:
+        print('no moulde loaded')
+    else:
+        sigma0 = np.array(sigma).flatten()
+        mu0 = np.array(mu)
+        smin0 = np.array(smin)
+        smax0 = np.array(smax)
+        # convert to r matrix
+        sigma_r = robjects.r['matrix'](robjects.FloatVector(sigma0),nrow=mu0.shape[0])
+        mu_r =robjects.FloatVector(mu0)
+        a = robjects.FloatVector(smin0)
+        b = robjects.FloatVector(smax0)
+        x = TruncatedNormal.rtmvnorm(nsample,mu_r,sigma_r,a,b)
+        return np.asarray(x)
 

@@ -171,17 +171,17 @@ if __name__ == "__main__":
     #test_01() #loading output instead
     #test_02() #loading output instead
     #test_03() #loading output inteaad
-    test01 = read_output("test_01_result.txt")
+    test01 = read_output("test_01_result_R.txt")
     test01_res = np.fromstring(test01,sep='\n')
     test01_tv = test01_res[-1]
     test01_est = test01_res[0:-1]
     
-    test02 = read_output("test_02_result.txt")
+    test02 = read_output("test_02_result_R.txt")
     test02_res = np.fromstring(test02,sep='\n')
     test02_tv = test02_res[-1]
     test02_est = test02_res[0:-1]
     
-    test03 = read_output("test_03_result.txt")
+    test03 = read_output("test_03_result_R.txt")
     test03_res = np.fromstring(test03,sep='\n')
     test03_tv = test03_res[-1]
     test03_est = test03_res[0:-1]
@@ -198,7 +198,7 @@ if __name__ == "__main__":
     plt.legend()
     plt.xlabel("bias")
     plt.title('2,000 replications\n50 temperatures between (0,1)\n 1,000 draws at each temperature')
-    f0.savefig('bc_MC_replications.pdf',bbox_inches='tight',dpi=100)
+    f0.savefig('bc_MC_replications_R.pdf',bbox_inches='tight',dpi=100)
     
     
 
