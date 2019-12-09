@@ -16,7 +16,7 @@ from scipy.stats import kstest
 import scipy.integrate as intergrate
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
-os.chdir('C:\\Users\\z5187692\\OneDrive - UNSW\\SDA\\SDA_project\\')
+#os.chdir('C:\\Users\\z5187692\\OneDrive - UNSW\\SDA\\SDA_project\\')
 import bivariate_case as bc
 import SDAutility as Sutil
 import seaborn as sns
@@ -32,8 +32,6 @@ def bc_demonstration(mu,sigma,smin,smax,t_space):
     
     for t in range(t_space.size):
         bc0 = bc.Bivariate_Normal_Path_sample(smin,smax,t_space[t],mu,sigma,1000,False,0)
-        #bc1 = bc.Bivariate_Normal_Path_sample(smin,smax,t_space[t],mu,sigma,1000,True,1)
-        #bc2 = bc.Bivariate_Normal_Path_sample(smin,smax,t_space[t],mu,sigma,1000,True,2)
         bc0.get_expectation()
         #bc1.get_expectation()
         #bc2.get_expectation()
@@ -76,16 +74,16 @@ def test_01():
     smax = np.max(obs,axis=0)
     num_t = 50
     t_space = np.log(np.logspace(start=0.0001,stop=1,base=np.e,num=num_t))
-    #est = np.zeros(5)
+
     est = [bc_demonstration(mu,sigma,smin,smax,t_space) for i in range(2000)]
-    tv = bc.log_phi1(smin,smax,mu,sigma)
-    plot_to_hist(est,tv,mu,sigma,'test_01')
+    tv = bc.log_phi1(smin,smax,mu,sigma) 
+    plot_to_hist(est,tv,mu,sigma,'test_01_qmc')
     est.append(tv)
     est.append(mu)
     est.append(sigma)
     est.append(smin)
     est.append(smax)
-    with open('test_01_result.txt', 'w') as f:
+    with open('test_01_result_qmc.txt', 'w') as f:
         for item in est:
             f.write("%s\n" % item)
     
@@ -102,13 +100,13 @@ def test_02():
     #est = np.zeros(2000)
     est = [bc_demonstration(mu,sigma,smin,smax,t_space) for i in range(2000)]
     tv = bc.log_phi1(smin,smax,mu,sigma)
-    plot_to_hist(est,tv,mu,sigma,'test_02')
+    plot_to_hist(est,tv,mu,sigma,'test_02_qmc')
     est.append(tv)
     est.append(mu)
     est.append(sigma)
     est.append(smin)
     est.append(smax)
-    with open('test_02_result.txt', 'w') as f:
+    with open('test_02_result_qmc.txt', 'w') as f:
         for item in est:
             f.write("%s\n" % item)
             
@@ -124,13 +122,13 @@ def test_03():
     est = np.zeros(2000)
     est = [bc_demonstration(mu,sigma,smin,smax,t_space) for i in range(2000)]
     tv = bc.log_phi1(smin,smax,mu,sigma)
-    plot_to_hist(est,tv,mu,sigma,'test_03')
+    plot_to_hist(est,tv,mu,sigma,'test_03_qmc')
     est.append(tv)
     est.append(mu)
     est.append(sigma)
     est.append(smin)
     est.append(smax)
-    with open('test_03_result.txt', 'w') as f:
+    with open('test_03_result_qmc.txt', 'w') as f:
         for item in est:
             f.write("%s\n" % item)
             
@@ -165,42 +163,72 @@ def read_output(fn):
         out = f.read()
     return out
     
-
+def pre_process(fn):
+    test = read_output(fn)
+    test_res = np.fromstring(test,sep='\n')
+    test_tv = test_res[-1]
+    test_est = test_res[0:-1]
+    return test_est,test_tv
+    
+    
 #%% replication of 1000 times
 if __name__ == "__main__":
     #test_01() #loading output instead
     #test_02() #loading output instead
     #test_03() #loading output inteaad
-    test01 = read_output("test_01_result_R.txt")
-    test01_res = np.fromstring(test01,sep='\n')
-    test01_tv = test01_res[-1]
-    test01_est = test01_res[0:-1]
     
-    test02 = read_output("test_02_result_R.txt")
-    test02_res = np.fromstring(test02,sep='\n')
-    test02_tv = test02_res[-1]
-    test02_est = test02_res[0:-1]
-    
-    test03 = read_output("test_03_result_R.txt")
-    test03_res = np.fromstring(test03,sep='\n')
-    test03_tv = test03_res[-1]
-    test03_est = test03_res[0:-1]
-    
-    
-    bias01 = test01_est-test01_tv
-    bias02 = test02_est-test02_tv
-    bias03 = test03_est-test03_tv
-    
+    # note it is not quasi monte carlo 
+    os.chdir('C:\\Users\\z5187692\\OneDrive - UNSW\\SDA\\SDA_project\\output\\')
+    test01_qmc_est, test01_qmc_tv = pre_process("test_01_result_qmc.txt")
+    test02_qmc_est, test02_qmc_tv = pre_process("test_02_result_qmc.txt")
+    test03_qmc_est, test03_qmc_tv = pre_process("test_03_result_qmc.txt")
+
+
+
+    test01_mc_est, test01_mc_tv = pre_process("test_01_result.txt")
+    test02_mc_est, test02_mc_tv = pre_process("test_02_result.txt")
+    test03_mc_est, test03_mc_tv = pre_process("test_03_result.txt")
+
+    ratio01_qmc = test01_qmc_est/test01_qmc_tv
+    ratio02_qmc = test02_qmc_est/test02_qmc_tv
+    ratio03_qmc = test03_qmc_est/test03_qmc_tv
+
+    ratio01_mc = test01_mc_est/test01_mc_tv
+    ratio02_mc = test02_mc_est/test02_mc_tv
+    ratio03_mc = test03_mc_est/test03_mc_tv
+     
     f0 = plt.figure(figsize=(6,6))
-    sns.distplot(bias01, label ="rho = 0.9")
-    sns.distplot(bias02,label="rho = 0.5")
-    sns.distplot(bias03,label="rho = 0.1")
+    sns.distplot(ratio01_qmc, label ="rho = 0.9")
+    sns.distplot(ratio02_qmc,label="rho = 0.5")
+    sns.distplot(ratio03_qmc,label="rho = 0.1")
+    plt.legend()
+    plt.xlabel("ratio (estimates/true value)")
+    plt.title('2,000 replications\n50 temperatures between (0,1)\n 1,000 draws at each temperature')
+    f0.savefig('bc_MC_replications_R_package.pdf',bbox_inches='tight',dpi=100)
+    
+    
+    f1 = plt.figure(figsize=(6,6))
+    sns.distplot(ratio01_mc, label ="rho = 0.9")
+    sns.distplot(ratio02_mc,label="rho = 0.5")
+    sns.distplot(ratio03_mc,label="rho = 0.1")
     plt.legend()
     plt.xlabel("bias")
     plt.title('2,000 replications\n50 temperatures between (0,1)\n 1,000 draws at each temperature')
-    f0.savefig('bc_MC_replications_R.pdf',bbox_inches='tight',dpi=100)
+    f1.savefig('bc_MC_replications_R_gibbs.pdf',bbox_inches='tight',dpi=100)
     
-    
+   
+    f2, axes = plt.subplots(3, 1)
+    sns.distplot(ratio01_mc, label ="rho = 0.9, Gibbs",ax=axes[0])
+    sns.distplot(ratio01_qmc,label="rho = 0.9, Botev",ax=axes[0])
+    axes[0].legend()
+    sns.distplot(ratio02_mc, label ="rho = 0.5, Gibbs",ax=axes[1])
+    sns.distplot(ratio02_qmc,label="rho = 0.5, Botev",ax=axes[1])
+    axes[1].legend()
+    sns.distplot(ratio03_mc, label ="rho = 0.1, Gibbs",ax=axes[2])
+    sns.distplot(ratio03_qmc,label="rho = 0.1, Botev",ax=axes[2])
+    axes[2].legend()
+    f2.savefig('compare_between_Botev_Gibbs_sampling.pdf',bbox_inches='tight',dpi=100)
+ 
 
     		  	   		   	  			  	
     

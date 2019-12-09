@@ -35,7 +35,7 @@ class Bivariate_Normal_Path_sample:
         self.phi_theta = np.zeros(self.nsample)
     
     def sample_z_Rrtmvnorm(self):
-        self.z = Sutil.Rrtmvnorm(self.mu,self.sigma,self.smin,self.smax,self.nsample)
+        self.z = Sutil.Rrtmvnorm(self.mu,self.sigma_at_t,self.smin,self.smax,self.nsample)
     
         # use gibbs sampler to sample from a truncated bivariate normal dist
     def sample_z_gibbs(self):

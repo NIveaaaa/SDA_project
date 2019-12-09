@@ -1,6 +1,5 @@
 ---
 title: "ZV-CV"
-author: "Yu Yang"
 date: "22 November 2019"
 output:
   word_document: default
@@ -16,7 +15,7 @@ An example:
 
 We plan to evaluate $E_{z\sim q}[log g(z;\theta)]dz$, where $q_t(z,\theta) = TN(\mu,\sigma/\sqrt{t})$ (a truncated normal distribution), $g(z;\theta)=N(\mu,\sigma)$.
 
-Suppose $smin = -2$, $smax = 2$, $t = 1$, $\mu=1$,$\sigma=1$.
+Suppose $smin = -2$, $smax = 2$, $t = 1$, $\mu=0$,$\sigma=1$.
 
 We can obtain expectation analytically by:
 
@@ -35,29 +34,25 @@ true_value =function(smin,smax,mu,sigma,t){
   return(true_value)
 }
 
+N <- 200
 
-N <- 1000
-#mymean = c(1,2)
-#mycov <- matrix(c(1,0.5,0.5,2),nrow=2)
-mymean = 1
+mymean = 0
 mycov = 1
-t = 1
+
 require(mvtnorm)
 set.seed(1)
-smin_set = -1
-smax_set = 1
-samples <- rtruncnorm(N,a=smin_set,b=smax_set,mymean,sqrt(mycov/t/t))
-# samples <- rmvnorm(N, mean = mymean, sigma = mycov)
-integrand <- dnorm(samples,mymean,sqrt(mycov/t/t),log=TRUE)
+smin_set = -2
+smax_set = 2
+samples <- rtruncnorm(N,a=smin_set,b=smax_set,mymean,sqrt(mycov))
+
+integrand <- dnorm(samples,mymean,sqrt(mycov),log=TRUE)
 
 
 #' # derivatives of Gaussian wrt x
 #derivatives <- t( apply(samples,1,function(x) -solve(mycov)%*%(x - mymean)) ) 
-derivatives <- c(-solve(mycov))*(samples-mymean)*t
+derivatives <- -c(solve(mycov))*(samples-mymean)
 #' 
-#' # Estimates without ZV-CV (i.e. vanilla Monte Carlo integration)
-#' # Without the ZVCV package
-mean(integrand)
+
 #' # With the ZVCV package
 order0<-zvcv(integrand,samples,derivatives,options = list(polyorder = 0))$expectation
 
@@ -68,18 +63,17 @@ order1<-zvcv(integrand,samples,derivatives,options = list(polyorder = 1,regul_re
 order2<-zvcv(integrand,samples,derivatives,options = list(polyorder = 2,regul_reg=FALSE))$expectation
 
 # true value
-tv <- true_value(smin=smin_set,smax=smax_set,mu=mymean,sigma=sqrt(mycov/t/t),t=1)
+tv <- true_value(smin=smin_set,smax=smax_set,mu=mymean,sigma=sqrt(mycov/1/1),t=1)
 
 
-sprintf(paste('smin/smax:',smin_set,'/',smax_set))
+paste('smin/smax:',smin_set,'/',smax_set)
 
-sprintf(paste('true value:',tv))
+paste('true value:',tv)
 
-sprintf(paste('order 0:', order0))
+paste('order 0:', order0)
 
-sprintf(paste('order 1:', order1))
+paste('order 1:', order1)
 
-sprintf(paste('order 2:', order2))
-
+paste('order 2:', order2)
 
 ```

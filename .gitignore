@@ -115,3 +115,6 @@ test.py
 *.docx
 *.html
 *.Rmd
+.Rhistory
+# output
+output/
