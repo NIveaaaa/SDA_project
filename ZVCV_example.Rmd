@@ -1,6 +1,6 @@
 ---
-title: "ZV-CV"
-date: "22 November 2019"
+title: "ZV-CV test"
+date: "11 Dec 2019"
 output:
   word_document: default
   pdf_document: default
@@ -13,28 +13,39 @@ knitr::opts_chunk$set(echo = TRUE)
 
 An example:
 
-We plan to evaluate $E_{z\sim q}[log g(z;\theta)]dz$, where $q_t(z,\theta) = TN(\mu,\sigma/\sqrt{t})$ (a truncated normal distribution), $g(z;\theta)=N(\mu,\sigma)$.
+We plan to evaluate $E_{z\sim q}[log g(z;\theta)]dz$, where $q_t(z,\theta) = TN(\mu,\sigma/\sqrt{t},smin,smax)$ (a truncated normal distribution), $g(z;\theta)=N(\mu,\sigma)$.
 
-Suppose $smin = -2$, $smax = 2$, $t = 1$, $\mu=0$,$\sigma=1$.
 
 We can obtain expectation analytically by:
 
 \[ E_{z\sim q} [ log g(z;\theta)] = -0.5 log 2\pi - log\sigma - E_{z\sim q} \dfrac{(z-\mu)^2}{2\sigma^2} \]
+
+By using the fact that $\dfrac{z-\mu}{\sigma/\sqrt{t}}$ is a standarded truncated normal distribution with boundary points $a=(smin-\mu)/(\sigma/\sqrt{t})$, $b=(smax-\mu)/(\sigma/\sqrt{t})$,  the packakage \text{truncnorm} etruncnorm(.) and vtruncnorm(.) can be used to get the value for 2nd moments.
+
+In the implementation:
+
+Integrand is  $log g(z;\theta)$
+
+samples are $z$, where $z\sim TN(\mu,\sigma/\sqrt{t},smin,smax)$
+
+derivates are $-\frac{z-\mu}{\sigma^2/t}$
+
+Set $smin = -2$, $smax = 2$, $t = 1$ (coding for t is omitted), $\mu=0$,$\sigma=1$ and N=2000 (number of samples).
 
 ```{r}
 library(ZVCV)
 library(truncnorm)
 
 true_value =function(smin,smax,mu,sigma,t){
-  a = (smin - mu)/sigma/sqrt(2*t)
-  b = (smax - mu)/sigma/sqrt(2*t)
-  mean_value = etruncnorm(a,b,mean=0,sd =1/sqrt(2*t))
-  var_value = vtruncnorm(a,b,mean=0,sd=1/sqrt(2*t))
-  true_value = -0.5*log(2*pi)-log(sigma)- mean_value^2-var_value
+  a = (smin - mu)/sigma*sqrt(t)
+  b = (smax - mu)/sigma*sqrt(t)
+  mean_value = etruncnorm(a,b,mean=0,sd=1)
+  var_value = vtruncnorm(a,b,mean=0,sd=1)
+  true_value = -0.5*log(2*pi)-log(sigma)- 0.5*(mean_value^2+var_value)/t
   return(true_value)
 }
 
-N <- 200
+N <- 2000
 
 mymean = 0
 mycov = 1
@@ -49,13 +60,14 @@ integrand <- dnorm(samples,mymean,sqrt(mycov),log=TRUE)
 
 
 #' # derivatives of Gaussian wrt x
-#derivatives <- t( apply(samples,1,function(x) -solve(mycov)%*%(x - mymean)) ) 
 derivatives <- -c(solve(mycov))*(samples-mymean)
 #' 
 
 #' # With the ZVCV package
+# order 0 is the naive MC estimate
 order0<-zvcv(integrand,samples,derivatives,options = list(polyorder = 0))$expectation
 
+# MC_est <- mean(dnorm(samples,mean = mymean,sd = sqrt(mycov), log=TRUE))
 # polynomial with order 1 
 order1<-zvcv(integrand,samples,derivatives,options = list(polyorder = 1,regul_reg=FALSE))$expectation
 

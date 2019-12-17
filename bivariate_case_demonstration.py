@@ -16,7 +16,7 @@ from scipy.stats import kstest
 import scipy.integrate as intergrate
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
-#os.chdir('C:\\Users\\z5187692\\OneDrive - UNSW\\SDA\\SDA_project\\')
+# os.chdir('C:\\Users\\z5187692\\OneDrive - UNSW\\SDA\\SDA_project\\')
 import bivariate_case as bc
 import SDAutility as Sutil
 import seaborn as sns
@@ -24,45 +24,21 @@ import seaborn as sns
 
 #%%
 
-def bc_demonstration(mu,sigma,smin,smax,t_space):
+def bc_demonstration(mu,sigma,smin,smax,t_space,Method):
     log_phi0 = np.sum(np.log(smax-smin))
     expect_order0 = np.zeros(t_space.size)
-    #expect_order1 = np.zeros(num_t)
-    #expect_order2 = np.zeros(num_t)
     
     for t in range(t_space.size):
-        bc0 = bc.Bivariate_Normal_Path_sample(smin,smax,t_space[t],mu,sigma,1000,False,0)
+        bc0 = bc.Bivariate_Normal_Path_sample(smin,smax,t_space[t],\
+                                              mu,sigma,1000,False,0,Method)
         bc0.get_expectation()
-        #bc1.get_expectation()
-        #bc2.get_expectation()
-        expect_order0[t] = bc0.expectation
-        #expect_order1[t] = bc1.expectation
-        #expect_order2[t] = bc2.expectation
-    
+        expect_order0[t] = bc0.expectation    
     t0,final_t0 = Sutil.compute_integral_1st(expect_order0,t_space)
-    #t1,final_t1 = Sutil.compute_integral_1st(expect_order1,t_space)
-    #t2,final_t2 = Sutil.compute_integral_1st(expect_order2,t_space)
-    
-    #result_order1 = [final_t0,final_t1,final_t2] + log_phi0
     result_order1 = final_t0 + log_phi0
     
-    #print('estimation of approximation of order 1\n')
-    print('estimation  -poly order 0:', result_order1)
-    #print('estimation  -poly order 1:', result_order1[1])
-    #print('estimation  -poly order 2:', result_order1[2])
+    #print('estimation poly order 0:', result_order1)
     return result_order1
 
-
-"""
-t0_order1,t0_order2 = bc.compute_integral_2nd(smin,smax,mu,sigma,t_space,1000,False,0)
-t1_order1,t1_order2 = bc.compute_integral_2nd(smin,smax,mu,sigma,t_space,1000,True,1)
-
-result_order2 = [t0_order2,t1_order2] + log_phi0
-
-print('estimation of approximaiton of order 2\n')
-print('estimation  -poly order 0:', result_order2[0])
-print('estimation  -poly order 1:', result_order2[1])
-"""
 
 
 
@@ -75,17 +51,24 @@ def test_01():
     num_t = 50
     t_space = np.log(np.logspace(start=0.0001,stop=1,base=np.e,num=num_t))
 
-    est = [bc_demonstration(mu,sigma,smin,smax,t_space) for i in range(2000)]
+    est_botev = [bc_demonstration(mu,sigma,smin,smax,t_space,
+                                  'Botev') for i in range(2000)]
+    
+    est_gibbs = [bc_demonstration(mu,sigma,smin,smax,t_space,'Gibbs')\
+                   for i in range(2000)]
+        
+    est_qmc_rej = [bc_demonstration(mu,sigma,smin,smax,t_space,'QMC_rej')\
+                   for i in range(2000)]
+
+    est_rej  =   [bc_demonstration(mu,sigma,smin,smax,t_space,'Rej')\
+                   for i in range(2000)]
+    
     tv = bc.log_phi1(smin,smax,mu,sigma) 
-    plot_to_hist(est,tv,mu,sigma,'test_01_qmc')
-    est.append(tv)
-    est.append(mu)
-    est.append(sigma)
-    est.append(smin)
-    est.append(smax)
-    with open('test_01_result_qmc.txt', 'w') as f:
-        for item in est:
+
+    with open('test_01_result_all.txt', 'w') as f:
+        for item in [est_botev,est_gibbs,est_qmc_rej,est_rej,tv,mu,sigma,smin,smax]:
             f.write("%s\n" % item)
+            
     
 
 
@@ -98,16 +81,20 @@ def test_02():
     num_t = 50
     t_space = np.log(np.logspace(start=0.0001,stop=1,base=np.e,num=num_t))
     #est = np.zeros(2000)
-    est = [bc_demonstration(mu,sigma,smin,smax,t_space) for i in range(2000)]
-    tv = bc.log_phi1(smin,smax,mu,sigma)
-    plot_to_hist(est,tv,mu,sigma,'test_02_qmc')
-    est.append(tv)
-    est.append(mu)
-    est.append(sigma)
-    est.append(smin)
-    est.append(smax)
-    with open('test_02_result_qmc.txt', 'w') as f:
-        for item in est:
+    est_botev = [bc_demonstration(mu,sigma,smin,smax,t_space,
+                                  'Botev') for i in range(2000)]
+    est_gibbs = [bc_demonstration(mu,sigma,smin,smax,t_space,'Gibbs')\
+                   for i in range(2000)]
+    est_qmc_rej = [bc_demonstration(mu,sigma,smin,smax,t_space,'QMC_rej')\
+                   for i in range(2000)]
+
+    est_rej  =   [bc_demonstration(mu,sigma,smin,smax,t_space,'Rej')\
+                   for i in range(2000)]
+    
+    tv = bc.log_phi1(smin,smax,mu,sigma) 
+
+    with open('test_02_result_all.txt', 'w') as f:
+        for item in [est_botev,est_gibbs,est_qmc_rej,est_rej,tv,mu,sigma,smin,smax]:
             f.write("%s\n" % item)
             
             
@@ -119,19 +106,21 @@ def test_03():
     smax = np.max(obs,axis=0)
     num_t = 50
     t_space = np.log(np.logspace(start=0.0001,stop=1,base=np.e,num=num_t))
-    est = np.zeros(2000)
-    est = [bc_demonstration(mu,sigma,smin,smax,t_space) for i in range(2000)]
-    tv = bc.log_phi1(smin,smax,mu,sigma)
-    plot_to_hist(est,tv,mu,sigma,'test_03_qmc')
-    est.append(tv)
-    est.append(mu)
-    est.append(sigma)
-    est.append(smin)
-    est.append(smax)
-    with open('test_03_result_qmc.txt', 'w') as f:
-        for item in est:
+    est_botev = [bc_demonstration(mu,sigma,smin,smax,t_space,
+                                  'Botev') for i in range(2000)]
+    est_gibbs = [bc_demonstration(mu,sigma,smin,smax,t_space,'Gibbs')\
+                   for i in range(2000)]
+    est_qmc_rej = [bc_demonstration(mu,sigma,smin,smax,t_space,'QMC_rej')\
+                   for i in range(2000)]
+
+    est_rej  =   [bc_demonstration(mu,sigma,smin,smax,t_space,'Rej')\
+                   for i in range(2000)]
+    
+    tv = bc.log_phi1(smin,smax,mu,sigma) 
+
+    with open('test_03_result_all.txt', 'w') as f:
+        for item in [est_botev,est_gibbs,est_qmc_rej,est_rej,tv,mu,sigma,smin,smax]:
             f.write("%s\n" % item)
-            
 
 
         
@@ -173,11 +162,12 @@ def pre_process(fn):
     
 #%% replication of 1000 times
 if __name__ == "__main__":
-    #test_01() #loading output instead
-    #test_02() #loading output instead
-    #test_03() #loading output inteaad
+    test_01() #loading output instead
+    test_02() #loading output instead
+    test_03() #loading output inteaad
     
     # note it is not quasi monte carlo 
+    """
     os.chdir('C:\\Users\\z5187692\\OneDrive - UNSW\\SDA\\SDA_project\\output\\')
     test01_qmc_est, test01_qmc_tv = pre_process("test_01_result_qmc.txt")
     test02_qmc_est, test02_qmc_tv = pre_process("test_02_result_qmc.txt")
@@ -228,7 +218,7 @@ if __name__ == "__main__":
     sns.distplot(ratio03_qmc,label="rho = 0.1, Botev",ax=axes[2])
     axes[2].legend()
     f2.savefig('compare_between_Botev_Gibbs_sampling.pdf',bbox_inches='tight',dpi=100)
- 
+    """
 
     		  	   		   	  			  	
     

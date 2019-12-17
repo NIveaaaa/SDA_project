@@ -32,10 +32,13 @@ def getX_order2(sample,derivative):
 
 
 def compute_integral_1st(est_expect,t_space):
-    end_point = est_expect
+    keep_index = np.isfinite(est_expect)
+    end_point = est_expect[keep_index]
+    t_space_temp = t_space[keep_index]
     left_point = end_point[0:-1]
     right_point = end_point[1:]
-    final_result = np.multiply(np.diff(t_space),np.mean([left_point,right_point],axis=0))
+    final_result = np.multiply(np.diff(t_space_temp),
+                               np.mean([left_point,right_point],axis=0))
     return end_point,np.sum(final_result)+end_point[0]*t_space[0]
 
 def Rrtmvnorm(mu,sigma,smin,smax,nsample):

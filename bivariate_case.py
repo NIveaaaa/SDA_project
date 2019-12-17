@@ -15,11 +15,12 @@ import matplotlib.pyplot as plt
 import statsmodels.api as sm
 from scipy.stats import multivariate_normal
 import SDAutility as Sutil
+import torch
 #%%
 class Bivariate_Normal_Path_sample:
     
     def __init__(self,smin,smax,t,mu,sigma,\
-                 nsample = None, use_CV = False, CV_order = 0):
+                 nsample = None, use_CV = False, CV_order = 0,Method='Botev'):
         self.smin = smin
         self.smax = smax
         self.t = t
@@ -29,16 +30,34 @@ class Bivariate_Normal_Path_sample:
         if nsample is None:
             self.nsample = int(1000)
         else: self.nsample = int(nsample)
-        self.z = np.zeros([self.nsample,2])
         self.use_CV = use_CV 
         self.CV_order = CV_order
         self.phi_theta = np.zeros(self.nsample)
-    
+        self.chol_L = np.linalg.cholesky(self.sigma_at_t)
+        self.Method = Method
+        self.z = []
+
+    # Botev method
     def sample_z_Rrtmvnorm(self):
         self.z = Sutil.Rrtmvnorm(self.mu,self.sigma_at_t,self.smin,self.smax,self.nsample)
     
-        # use gibbs sampler to sample from a truncated bivariate normal dist
+    # QMC rej
+    def sample_z_qmc_rej(self):
+        soboleng = torch.quasirandom.SobolEngine(dimension = 2,scramble=True)
+        qmc_num = soboleng.draw(self.nsample)
+        
+        z_star = np.empty(shape=qmc_num.shape)
+        for i in range(2):
+            z_star[:,i] = norm.ppf(qmc_num[:,i])
+        z= np.transpose(self.chol_L@np.transpose(z_star))+self.mu
+        
+        keep_index = np.all(z>=self.smin,axis=1) & np.all(z<=self.smax,axis=1)
+        self.z = z[keep_index,:]
+        
+
+    # Gibbs, Robert paper
     def sample_z_gibbs(self):
+        self.z = np.zeros([self.nsample,2])
         z = np.zeros([self.nsample,2])
         sd0 = np.sqrt(self.sigma_at_t[0,0])
         sd1 = np.sqrt(self.sigma_at_t[1,1])
@@ -60,12 +79,24 @@ class Bivariate_Normal_Path_sample:
         self.z[:,0] = z[:,0]*sd0 + self.mu[0]
         self.z[:,1] = z[:,1]*sd1 + self.mu[1]
 
-
-
+    def sample_z_rej(self):
+        z = np.random.multivariate_normal(self.mu,self.sigma_at_t,size=self.nsample)
+        keep_index = np.all(z>=self.smin,axis=1) & np.all(z<=self.smax,axis=1)
+        self.z = z[keep_index,:]
     
     def get_phi_theta(self):
-        #self.sample_z_gibbs()
-        self.sample_z_Rrtmvnorm()
+        
+        if self.Method == 'Botev':
+            self.sample_z_Rrtmvnorm()
+        elif self.Method =='Gibbs':
+            self.sample_z_gibbs()
+        elif self.Method =='QMC_rej':
+            self.sample_z_qmc_rej()
+        elif self.Method =="Rej":
+            self.sample_z_rej()
+        else:
+            print('Invalid Method')
+
         self.phi_theta = multivariate_normal.logpdf(self.z,self.mu,self.sigma)
     
     def get_expectation(self):
@@ -92,6 +123,10 @@ class Bivariate_Normal_Path_sample:
         model = sm.OLS(self.phi_theta, x_theta)
         results = model.fit()
         self.h_theta = np.sum( np.multiply(x,results.params[1:]),axis=1)
+     
+    #def __del__(self): 
+    #    print('Destructor called, Employee deleted.') 
+  
 
             
         
@@ -106,22 +141,29 @@ def log_phi1(smin,smax,mu,sigma):
 
 
 
-def compute_integral_2nd(smin,smax,mu,sigma,t_space,nsample=1000,use_CV=False,CV_order=0):
+def compute_integral_2nd(smin,smax,mu,sigma,t_space,nsample=1000,use_CV=False,CV_order=0,Method='Botev'):
     mean_end_point = np.zeros(t_space.shape[0])
     var_end_point = np.zeros(t_space.shape[0])
     for i in np.arange(start=0,stop=t_space.shape[0],step=1):
         uni = Bivariate_Normal_Path_sample(smin,smax,t_space[i],mu,sigma,\
-                                           nsample,use_CV,CV_order)
+                                           nsample,use_CV,CV_order,Method)
         uni.get_expectation()
+
         mean_end_point[i] = uni.expectation
         var_end_point[i] = np.std(uni.z)
-    diff_t_space = np.diff(t_space)
+        
+    keep_index = np.isfinite(mean_end_point)
+    t_space_temp = t_space[keep_index]
+    mean_end_point = mean_end_point[keep_index]
+    var_end_point = var_end_point[keep_index]
+    #print(mean_end_point)
+    diff_t_space = np.diff(t_space_temp)
     first_approx = np.multiply(diff_t_space,\
                               np.mean([mean_end_point[0:-1],\
                                        mean_end_point[1:]],axis=0))
     quad_approx = first_approx - np.multiply(np.power(diff_t_space,2),\
                          np.diff(var_end_point))/12
-    return(np.sum(first_approx),np.sum(quad_approx))
-    
-                                             
+    return np.sum(first_approx),np.sum(quad_approx)
+
+                                      
 #%%    
