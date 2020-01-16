@@ -10,7 +10,7 @@ from scipy.special import comb
 import rpy2.robjects.packages as rpackages
 import rpy2.robjects as robjects
 
-TruncatedNormal = rpackages.importr('TruncatedNormal')
+TruncatedNormal = rpackages.importr('TruncatedNormal',lib_loc="E:/R-3.5.2/library")
 
 def getX_order1(derivative):
     Z = -0.5*derivative

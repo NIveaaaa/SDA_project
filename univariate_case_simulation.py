@@ -216,5 +216,7 @@ def testcase04():
     plt.xlabel("number of symbols (500 observations within each symbol)")
     plt.ylabel("ratio between estimation over true value")
     f0.savefig('result_diff_symbs_qmc.pdf')
+    
+
 if __name__=="__main__":
     testcase03()
