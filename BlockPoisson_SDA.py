@@ -12,7 +12,8 @@ import numpy.random as npr
 import scipy.stats as sps
 import sobol_seq
 import univariate_path_sampler as ups
-
+import copy
+#%%
 npr.seed(100)
 
 nSeq = 1 # This is used to keep track of where we are in the Sobol sequence we will generate.
@@ -28,7 +29,8 @@ S = np.array([[-2,2]]*M_BP)
 d = 1 # dimension of the integral we are estimating with the Sobol sequence.
 kwargs = {'M_BP' : M_BP,  'rho_BP' : rho_BP, 'd' : d, 'M' : M, 'approx_order': 1}
 isQuasi = False # If True then Quasi random uniform numbers. Otherwise standard uniform numbers
-
+temp = np.log(np.logspace(start=0.001,stop=1,num=200,base=np.e)) # temperature
+#%%
 def generate_Sobol(d, M):
     """
     Essentially a wrapper to the existing function but increases a global variable that keep tracks of where we are at the sequence.
@@ -72,12 +74,8 @@ def A_m_hat(theta, S, Nobs_BP,Random_nbrs):
           input: S (boundary points), Nobs_BP (num of observations) theta(parameter), nobs (number of observations per symbol)
           output: A_m_hat 
     """
-    A_m_hat = np.zeros(M_BP)
-    temp = np.log(np.logspace(start=0.001,stop=1,num=200,base=np.e))
-    for i in range(S.shape[0]): 
-    # TODO fix this, U is irregular shape
-        up =ups.univariate_path_sampler(S[i], Nobs_BP[i], temp, theta, U[4], **kwargs)
-
+    up =ups.univariate_path_sampler(S, Nobs_BP, temp, theta, Random_nbrs, **kwargs)
+    return up.numerical_integral()
         
 def log_abs_BP_estimator(theta, S, U, a_BP, **kwargs):
     """
@@ -85,16 +83,31 @@ def log_abs_BP_estimator(theta, S, U, a_BP, **kwargs):
     NOTE: theta is the parameter, S is the rectangle. I have not used them as I have not implemented A_m. This code assumes A_m is implemented. Your task is to implement A_m based on the uniform Quasi Random numbers (or standard uniform random numbers)
     """    
     M_BP, rho_BP, d, M = kwargs['M_BP'], kwargs['rho_BP'], kwargs['d'], kwargs['M']
-    A_m_hats_minus_a_BP = [np.prod([(A_m_hat(theta, S, subset) - a_BP) for subset in item]) for item in U] # NOTE: If a list is empty (corresponding Xi_l is zero), then it automatically gets 1.0
     
+    # A_m_hats has the same structure with U
+    A_m_hats = copy.deepcopy(U)
+  
+    # Rewrite the following line
+    #A_m_hats_minus_a_BP = [np.prod([(A_m_hat(theta, S, subset) - a_BP) for subset in item]) for item in U] # NOTE: If a list is empty (corresponding Xi_l is zero), then it automatically gets 1.0
+
+    for r in range(len(U)):
+        count = len(U[r])
+        if count == 0:
+            continue
+        else:
+            for j in range(len(U[r])):
+                A_m_hats[r][j] = A_m_hat(theta,S[r],Nobs_BP[r],np.asarray(U[r][j]).flatten())
+    A_m_hats_minus_a_BP = [np.prod(np.asarray(item) - a_BP) for item in A_m_hats]
     # Check sign of estimator. Can be negative only if we have an odd number of negatives.
     isNegative = np.sum(np.array(A_m_hats_minus_a_BP) < 0) % 2 == 1
     anyNegative = np.sum(np.array(A_m_hats_minus_a_BP) < 0) > 0 # means that at least one negative (might result in positive if an odd number of them). This is not necessary to save, just doing it so you can keep track of how often we actually get a negative term
     log_abs_prods = np.log(np.abs(A_m_hats_minus_a_BP))    
-    const = M*(a_BP + 1)
+    const = M_BP*(a_BP + 1)
     logEst = const + np.sum(log_abs_prods) # This is the log of the absolute value of the estimator.        
-    lower_bound_sample = np.min([item for sublist in [[A_m_hat(theta, S, subset) for subset in item] for item in U if item] for item in sublist]) # Just to check what the actual lower bound of the terms is for these random numbers.
-
+    
+    # Rewrite the following line
+    #lower_bound_sample = np.min([item for sublist in [[A_m_hat(theta, S, subset) for subset in item] for item in U if item] for item in sublist]) # Just to check what the actual lower bound of the terms is for these random numbers.
+    lower_bound_sample = np.min([item for sublist in A_m_hats if sublist for item in sublist])
     return logEst, isNegative, anyNegative, lower_bound_sample
 
 
@@ -106,6 +119,7 @@ def PropU_given_currentU(U, kappa, isQuasi, **kwargs):
     This will be used in the pseudo-marginal algorithm. It will update a subset of the random numbers (kappa of the blocks) and keep the rest fixed
     """
     # To Yu: When you implement the pseudo marginal MCMC, you need to keep in mind that UProp here alternates U! So, if you reject in the MH ratio, you need to reset the U (PLEASE DO NOT FORGET THIS).
+    # TODO later
     M_BP, rho_BP, d, M = kwargs['M_BP'], kwargs['rho_BP'], kwargs['d'], kwargs['M']
 
     U_Prop = U  
@@ -125,11 +139,9 @@ print(U)
 
 print("U_Prop")
 PropU_given_currentU(U, kappa, isQuasi, **kwargs)
-
+#%%
 def test():
-    temp = np.log(np.logspace(start=0.001,stop=1,num=200,base=np.e))
-    up =ups.univariate_path_sampler([-2,2], 200, temp, [0,1], sps.uniform.rvs(size=(200,1)), **kwargs)
-    print('true loglik:',up.true_log_L())
-    print('est loglik',up.loglik_symbol())
-    
+    up =ups.univariate_path_sampler(S[0], Nobs_BP[0], temp, theta, U[1], **kwargs)
+    print(up.true_log_L())
+    print(up.loglik_symbol())
 test()

@@ -52,6 +52,8 @@ class univariate_path_sampler:
         self.theta = theta
         self.rand_nbrs = rand_nbrs
         self.approx_order = kwargs['approx_order']
+        self.C1 =  math.lgamma(self.nobs+1)- math.lgamma(self.nobs-2+1)
+        self.C2 = np.sum(norm.logpdf([self.smin,self.smax],loc=self.mu,scale=self.sigma))
 
         
     def sample_z(self, t):
@@ -71,32 +73,34 @@ class univariate_path_sampler:
         temp_len = self.temp.shape[0]
         mean_end_point = np.zeros(temp_len)
         var_end_point = np.zeros(temp_len)
-        for i in np.arange(start=0,stop=temp_len,step=1):
-            mean_end_point[i],var_end_point[i] = self.calc_log_g(self.temp[i])
-        diff_t_space = np.diff(self.temp)
         
-        first_approx = np.multiply(diff_t_space,\
-                                  np.mean([mean_end_point[0:-1],\
-                                           mean_end_point[1:]],axis=0))
-        
-        quad_approx = first_approx - np.multiply(np.power(diff_t_space,2),\
-                             np.diff(var_end_point))/12
-        
-        if self.approx_order ==1:
-            return np.sum(first_approx)
-        if self.approx_order==2:
-            return np.sum(quad_approx)
+        if len(self.rand_nbrs)==0:
+            return np.NaN
+        else:
+            for i in np.arange(start=0,stop=temp_len,step=1):
+                mean_end_point[i],var_end_point[i] = self.calc_log_g(self.temp[i])
+            diff_t_space = np.diff(self.temp)
+            
+            first_approx = np.multiply(diff_t_space,\
+                                      np.mean([mean_end_point[0:-1],\
+                                               mean_end_point[1:]],axis=0))
+            
+            quad_approx = first_approx - np.multiply(np.power(diff_t_space,2),\
+                                 np.diff(var_end_point))/12
+            
+            if self.approx_order ==1:
+                return np.sum(first_approx)
+            if self.approx_order==2:
+                return np.sum(quad_approx)
     
     def loglik_symbol(self):
-        C1 = math.lgamma(self.nobs+1)- math.lgamma(self.nobs-2+1)
-        C2 = np.sum(norm.logpdf([self.smin,self.smax],loc=self.mu,scale=self.sigma))
-        #
         log_L = self.numerical_integral()+np.log(self.smax-self.smin)
-        C3 = np.sum(log_L)+ np.log(self.smax-self.smin)
-        logLik = C1 + C2 + (self.nobs -2)*C3
-        return logLik,log_L
+        print('est:',log_L)
+        return self.C1 + self.C2 + (self.nobs -2)*log_L
     
     def true_log_L(self):
-        return(np.log(norm.cdf(self.smax,loc=self.mu,scale=self.sigma)\
-                    -norm.cdf(self.smin,loc=self.mu,scale=self.sigma)))
+        true_logL = np.log(norm.cdf(self.smax,loc=self.mu,scale=self.sigma)\
+                    -norm.cdf(self.smin,loc=self.mu,scale=self.sigma))
+        print('true logL', true_logL)
+        return self.C1+self.C2+(self.nobs-2)*true_logL
         
