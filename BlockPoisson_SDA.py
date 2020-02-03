@@ -15,17 +15,16 @@ import univariate_path_sampler as ups
 import copy
 #%%
 npr.seed(100)
-
 nSeq = 1 # This is used to keep track of where we are in the Sobol sequence we will generate.
 M = 200 # Number of Monte Carlo / Quasi Monte Carlo numbers
-M_BP = 20 # Number of symbols (= number of blocks in the block-Poisson)
-Nobs_BP = np.repeat(100,M_BP) # Number of observations per symbol
+M_BP = None # Number of symbols (= number of blocks in the block-Poisson)
+Nobs_BP = np.repeat(100,30) # Number of observations per symbol
 rho_BP = 0.8 # Correlation in the pseudo marginal
 a_BP = 0.1 # The lower bound of the estimate of A_m.
 theta = None # This will later be the parameter
-#S = None # This will later be S_min, S_max
-theta = np.array([0,1])
-S = np.array([[-2,2]]*M_BP)
+S = None # This will later be S_min, S_max
+#theta = np.array([0,1])
+#S = np.array([[-2,2]]*M_BP)
 d = 1 # dimension of the integral we are estimating with the Sobol sequence.
 kwargs = {'M_BP' : M_BP,  'rho_BP' : rho_BP, 'd' : d, 'M' : M, 'approx_order': 1}
 isQuasi = False # If True then Quasi random uniform numbers. Otherwise standard uniform numbers
@@ -38,6 +37,7 @@ def generate_Sobol(d, M):
     # TO Matias: there is a bug on sobol_seq 0.1.2, the correct version should be installed from github source code. https://github.com/naught101/sobol_seq
     """
     global nSeq
+    
     seq = sobol_seq.i4_sobol_generate(d, M, skip = 2 + M*nSeq)
     nSeq = nSeq + 1 # Increase global counter
     return seq
@@ -65,7 +65,7 @@ def init_random_numbers(isQuasi, **kwargs):
     return U, kappa
 
 # Test init_random_numbers
-U, kappa = init_random_numbers(isQuasi, **kwargs)
+#U, kappa = init_random_numbers(isQuasi, **kwargs)
 
 def A_m_hat(theta, S, Nobs_BP,Random_nbrs):
     """
@@ -95,7 +95,7 @@ def log_abs_BP_estimator(theta, S, U, a_BP, **kwargs):
         if count == 0:
             continue
         else:
-            for j in range(len(U[r])):
+            for j in range(count):
                 A_m_hats[r][j] = A_m_hat(theta,S[r],Nobs_BP[r],np.asarray(U[r][j]).flatten())
     A_m_hats_minus_a_BP = [np.prod(np.asarray(item) - a_BP) for item in A_m_hats]
     # Check sign of estimator. Can be negative only if we have an odd number of negatives.
@@ -110,8 +110,6 @@ def log_abs_BP_estimator(theta, S, U, a_BP, **kwargs):
     lower_bound_sample = np.min([item for sublist in A_m_hats if sublist for item in sublist])
     return logEst, isNegative, anyNegative, lower_bound_sample
 
-
-results = log_abs_BP_estimator(theta, S, U, a_BP, **kwargs)
 
 def PropU_given_currentU(U, kappa, isQuasi, **kwargs):
     """
@@ -134,14 +132,6 @@ def PropU_given_currentU(U, kappa, isQuasi, **kwargs):
 
     return U_Prop
 
-print("Old U")
-print(U)
 
-print("U_Prop")
-PropU_given_currentU(U, kappa, isQuasi, **kwargs)
-#%%
-def test():
-    up =ups.univariate_path_sampler(S[0], Nobs_BP[0], temp, theta, U[1], **kwargs)
-    print(up.true_log_L())
-    print(up.loglik_symbol())
-test()
+
+# PropU_given_currentU(U, kappa, isQuasi, **kwargs)
