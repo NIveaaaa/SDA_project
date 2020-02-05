@@ -95,12 +95,12 @@ class univariate_path_sampler:
     
     def loglik_symbol(self):
         log_L = self.numerical_integral()+np.log(self.smax-self.smin)
-        print('est:',log_L)
+        #print('est:',log_L)
         return self.C1 + self.C2 + (self.nobs -2)*log_L
     
     def true_log_L(self):
         true_logL = np.log(norm.cdf(self.smax,loc=self.mu,scale=self.sigma)\
                     -norm.cdf(self.smin,loc=self.mu,scale=self.sigma))
-        print('true logL', true_logL)
+        #print('true logL', true_logL)
         return self.C1+self.C2+(self.nobs-2)*true_logL
         

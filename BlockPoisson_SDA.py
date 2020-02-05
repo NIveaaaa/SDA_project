@@ -17,14 +17,14 @@ import copy
 npr.seed(100)
 nSeq = 1 # This is used to keep track of where we are in the Sobol sequence we will generate.
 M = 200 # Number of Monte Carlo / Quasi Monte Carlo numbers
-M_BP = None # Number of symbols (= number of blocks in the block-Poisson)
+M_BP = 30 # Number of symbols (= number of blocks in the block-Poisson)
 Nobs_BP = np.repeat(100,30) # Number of observations per symbol
-rho_BP = 0.8 # Correlation in the pseudo marginal
+rho_BP = 0.99 # Correlation in the pseudo marginal
 a_BP = 0.1 # The lower bound of the estimate of A_m.
 theta = None # This will later be the parameter
 S = None # This will later be S_min, S_max
-#theta = np.array([0,1])
-#S = np.array([[-2,2]]*M_BP)
+theta = np.array([0,1])
+S = np.array([[-2,2]]*M_BP)
 d = 1 # dimension of the integral we are estimating with the Sobol sequence.
 kwargs = {'M_BP' : M_BP,  'rho_BP' : rho_BP, 'd' : d, 'M' : M, 'approx_order': 1}
 isQuasi = False # If True then Quasi random uniform numbers. Otherwise standard uniform numbers
@@ -65,7 +65,7 @@ def init_random_numbers(isQuasi, **kwargs):
     return U, kappa
 
 # Test init_random_numbers
-#U, kappa = init_random_numbers(isQuasi, **kwargs)
+U, kappa = init_random_numbers(isQuasi, **kwargs)
 
 def A_m_hat(theta, S, Nobs_BP,Random_nbrs):
     """
@@ -75,7 +75,7 @@ def A_m_hat(theta, S, Nobs_BP,Random_nbrs):
           output: A_m_hat 
     """
     up =ups.univariate_path_sampler(S, Nobs_BP, temp, theta, Random_nbrs, **kwargs)
-    return up.numerical_integral()
+    return up.loglik_symbol()
         
 def log_abs_BP_estimator(theta, S, U, a_BP, **kwargs):
     """
@@ -111,16 +111,51 @@ def log_abs_BP_estimator(theta, S, U, a_BP, **kwargs):
     return logEst, isNegative, anyNegative, lower_bound_sample
 
 
+
+def log_abs_BP_estimator_new(theta,S,U,BlocksToChange,A_m_hats_old,a_BP, **kwargs):
+    M_BP, rho_BP, d, M = kwargs['M_BP'], kwargs['rho_BP'], kwargs['d'], kwargs['M']
+    
+    A_m_hats = copy.deepcopy(A_m_hats_old)
+    
+    #BlocksToKeep = [i for i in np.arange(M_BP) if i not in BlocksToChange]
+    
+    for BlockToChange in BlocksToChange:
+        # print('BlockToChange:',BlockToChange)
+        # clean up A_m_hats
+        A_m_hats[BlockToChange] = []
+        count = len(U[BlockToChange])
+        # print('count:',count)
+        if count == 0:
+            continue
+        else:
+            templik = [A_m_hat(theta,S[BlockToChange],Nobs_BP[BlockToChange],np.asarray(U[BlockToChange][j]).flatten()) for j in range(count)]
+            A_m_hats[BlockToChange] = templik
+    A_m_hats_minus_a_BP = [np.prod(np.asarray(item) - a_BP) for item in A_m_hats]
+    # Check sign of estimator. Can be negative only if we have an odd number of negatives.
+    isNegative = np.sum(np.array(A_m_hats_minus_a_BP) < 0) % 2 == 1
+    anyNegative = np.sum(np.array(A_m_hats_minus_a_BP) < 0) > 0 # means that at least one negative (might result in positive if an odd number of them). This is not necessary to save, just doing it so you can keep track of how often we actually get a negative term
+    log_abs_prods = np.log(np.abs(A_m_hats_minus_a_BP))    
+    const = M_BP*(a_BP + 1)
+    logEst = const + np.sum(log_abs_prods) # This is the log of the absolute value of the estimator.        
+    
+    # Rewrite the following line
+    #lower_bound_sample = np.min([item for sublist in [[A_m_hat(theta, S, subset) for subset in item] for item in U if item] for item in sublist]) # Just to check what the actual lower bound of the terms is for these random numbers.
+    templist = [item for sublist in A_m_hats if sublist for item in sublist]
+    lower_bound_sample = np.min([np.min(i) for i in templist])
+    #lower_bound_sample = np.min([item for sublist in A_m_hats if sublist for item in sublist])
+    return logEst, isNegative, A_m_hats, anyNegative, lower_bound_sample
+
+
 def PropU_given_currentU(U, kappa, isQuasi, **kwargs):
     """
     Block proposal of random numbers given the current random numbers U.
     This will be used in the pseudo-marginal algorithm. It will update a subset of the random numbers (kappa of the blocks) and keep the rest fixed
     """
     # To Yu: When you implement the pseudo marginal MCMC, you need to keep in mind that UProp here alternates U! So, if you reject in the MH ratio, you need to reset the U (PLEASE DO NOT FORGET THIS).
-    # TODO later
+
     M_BP, rho_BP, d, M = kwargs['M_BP'], kwargs['rho_BP'], kwargs['d'], kwargs['M']
 
-    U_Prop = U  
+    U_Prop = U
 
     BlocksToChange = npr.choice(M_BP, kappa, replace = False) # Which blocks to update
 
@@ -130,8 +165,10 @@ def PropU_given_currentU(U, kappa, isQuasi, **kwargs):
         else:
             U_Prop[BlockToChange] = [sps.uniform.rvs(size = (M, d)) for item in range(sps.poisson.rvs(1))]
 
-    return U_Prop
+    return U_Prop,BlocksToChange
 
 
-
-# PropU_given_currentU(U, kappa, isQuasi, **kwargs)
+BlocksToChange = np.array([3,2,1,5,12,10])
+btc, Uprop = PropU_given_currentU(U, kappa, isQuasi, **kwargs)
+log_abs_BP_estimator_new(theta,S,U,BlocksToChange,U,a_BP, **kwargs)
+#log_abs_BP_estimator(theta,S,U,a_BP, **kwargs)
